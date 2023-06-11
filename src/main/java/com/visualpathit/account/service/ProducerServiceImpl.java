@@ -16,7 +16,7 @@ public class ProducerServiceImpl implements ProducerService {
     /**
      *  The name of the Exchange
      */
-    private static final String EXCHANGE_NAME = "messages";
+    private static final String EXCHANGE_NAME = "Jezenith";
 
     /**
      *  This method publishes a message
