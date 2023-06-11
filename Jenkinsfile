@@ -1,13 +1,18 @@
 pipeline {
 
     agent any
-
+/*
+	tools {
+        maven "maven3"
+    }
+*/
     environment {
-        registry = "kubeimran/vproappdock"
-        registryCredential = 'dockerhu'
+        registry = "imranvisualpath/vproappdock"
+        registryCredential = 'dockerhub'
     }
 
     stages{
+
         stage('BUILD'){
             steps {
                 sh 'mvn clean install -DskipTests'
@@ -43,6 +48,32 @@ pipeline {
             }
         }
 
+
+        stage('Building image') {
+            steps{
+              script {
+                dockerImage = docker.build registry + ":$BUILD_NUMBER"
+              }
+            }
+        }
+        
+        stage('Deploy Image') {
+          steps{
+            script {
+              docker.withRegistry( '', registryCredential ) {
+                dockerImage.push("$BUILD_NUMBER")
+                dockerImage.push('latest')
+              }
+            }
+          }
+        }
+
+        stage('Remove Unused docker image') {
+          steps{
+            sh "docker rmi $registry:$BUILD_NUMBER"
+          }
+        }
+
         stage('CODE ANALYSIS with SONARQUBE') {
 
             environment {
@@ -66,36 +97,14 @@ pipeline {
                 }
             }
         }
-
-        stage('BUILD APP IMAGE'){
+        stage('Kubernetes Deploy') {
+	  agent { label 'KOPS' }
             steps {
-                script {
-                    dockerImage = docker.build("${registry}:V$BUILD_NUMBER")
-                }
+                    sh "helm upgrade --install --force vproifle-stack helm/vprofilecharts --set appimage=${registry}:${BUILD_NUMBER} --namespace prod"
             }
         }
 
-        stage('PUSH IMAGE TO DOCKER HUB'){
-            steps {
-                script {
-                    docker.withRegistry( '', registryCredential ) {
-                        dockerImage.push("V$BUILD_NUMBER")
-                        dockerImage.push('latest')
-                    }
-                }
-            }
-        }
-
-        stage('remove unused docker images'){
-            steps {
-                sh "docker rmi $registry:V$BUILD_NUMBER"
-            }
-        }
-
-        stage('DEPLOY TO KUBERNETES'){
-            steps {
-                sh "helm upgrade --install --force vprofile-stack helm/vprofilecharts --set appimage=${registry}:V${BUILD_NUMBER} --set namespace prod"
-            }
-        }
     }
+
+
 }
